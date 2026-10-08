@@ -9,10 +9,9 @@ function Login() {
 
   const handleLogin = (e) => {
     e.preventDefault();
-    
-    // Credenciais simples de acesso para a sua esposa
-    if (email === 'admin@msstore.com' && senha === '123456') {
-      localStorage.setItem('ms_logado', 'true');
+
+    if (email === 'emanuelej.silva@hotmail.com' && senha === 'Emanuele123@') {
+      localStorage.setItem('ms_admin_logado', 'true');
       navigate('/admin');
     } else {
       alert('E-mail ou senha incorretos!');
@@ -33,7 +32,7 @@ function Login() {
               type="email" 
               value={email} 
               onChange={(e) => setEmail(e.target.value)} 
-              placeholder="admin@msstore.com"
+              placeholder="emanuelej.silva@hotmail.com"
               required
               style={{ width: '100%', padding: '10px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }}
             />
@@ -45,7 +44,7 @@ function Login() {
               type="password" 
               value={senha} 
               onChange={(e) => setSenha(e.target.value)} 
-              placeholder="******"
+              placeholder="********"
               required
               style={{ width: '100%', padding: '10px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }}
             />
