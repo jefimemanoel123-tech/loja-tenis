@@ -103,6 +103,37 @@ export const getProdutos = async () => {
   return normalizarListaProdutos(data || []);
 };
 
+export const publicarImagensProduto = async (imagens = []) => {
+  if (!supabase) return imagens;
+
+  return Promise.all(imagens.map(async (imagem) => {
+    if (typeof imagem !== 'string' || !imagem.startsWith('data:image/')) {
+      return imagem;
+    }
+
+    const response = await fetch(imagem);
+    const arquivo = await response.blob();
+    const extensaoPorTipo = {
+      'image/jpeg': 'jpg',
+      'image/png': 'png',
+      'image/webp': 'webp',
+      'image/gif': 'gif',
+    };
+    const extensao = extensaoPorTipo[arquivo.type] || 'img';
+    const identificador = window.crypto?.randomUUID?.()
+      || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const caminho = `products/${identificador}.${extensao}`;
+    const { error } = await supabase.storage
+      .from('product-images')
+      .upload(caminho, arquivo, { contentType: arquivo.type, upsert: false });
+
+    if (error) throw error;
+
+    const { data } = supabase.storage.from('product-images').getPublicUrl(caminho);
+    return data.publicUrl;
+  }));
+};
+
 export const salvarProduto = async (produto, produtosLocais = []) => {
   if (!supabase) {
     const maiorIdExistente = produtosLocais.reduce(

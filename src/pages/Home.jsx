@@ -142,6 +142,10 @@ function Home() {
       mensagem += `   - Tamanho: ${item.tamanhoEscolhido}\n`;
       mensagem += `   - Cor: ${item.corEscolhida}\n`;
       mensagem += `   - Valor: R$ ${Number(item.valor).toFixed(2)}\n`;
+      const linksDasFotos = (item.imagens || []).filter((imagem) => /^https?:\/\//i.test(imagem));
+      linksDasFotos.forEach((link, indiceFoto) => {
+        mensagem += `   - Foto ${indiceFoto + 1}: ${link}\n`;
+      });
     });
 
     mensagem += `\n*Total a Pagar:* R$ ${calcularTotal()}`;

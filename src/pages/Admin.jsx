@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import LogoMs from '../assets/Logo-ms.png';
 import { hasSupabaseConfig } from '../lib/supabase';
-import { excluirProduto as excluirProdutoDoServico, getProdutos, salvarProduto as salvarProdutoNoServico } from '../services/produtosService';
+import { excluirProduto as excluirProdutoDoServico, getProdutos, publicarImagensProduto, salvarProduto as salvarProdutoNoServico } from '../services/produtosService';
 
 function Admin() {
   const navigate = useNavigate();
@@ -80,7 +80,8 @@ function Admin() {
     setSalvando(true);
     setErro('');
     try {
-      const produtoSalvo = await salvarProdutoNoServico(novoProdutoObj, produtos);
+      const imagensPublicadas = await publicarImagensProduto(novoProdutoObj.imagens);
+      const produtoSalvo = await salvarProdutoNoServico({ ...novoProdutoObj, imagens: imagensPublicadas }, produtos);
       setProdutos((atuais) => editandoId
         ? atuais.map((produto) => produto.id === editandoId ? produtoSalvo : produto)
         : [produtoSalvo, ...atuais]);
