@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import LogoMs from '../assets/Logo-ms.png';
+import { hasSupabaseConfig } from '../lib/supabase';
+import { excluirProduto as excluirProdutoDoServico, getProdutos, salvarProduto as salvarProdutoNoServico } from '../services/produtosService';
 
 function Admin() {
   const navigate = useNavigate();
   const [produtos, setProdutos] = useState([]);
+  const [erro, setErro] = useState('');
+  const [salvando, setSalvando] = useState(false);
 
   const [editandoId, setEditandoId] = useState(null);
   const [nome, setNome] = useState('');
@@ -25,9 +29,14 @@ function Admin() {
     carregarProdutos();
   }, [navigate]);
 
-  const carregarProdutos = () => {
-    const salvos = JSON.parse(localStorage.getItem('ms_produtos')) || [];
-    setProdutos(salvos);
+  const carregarProdutos = async () => {
+    try {
+      const salvos = await getProdutos();
+      setProdutos(salvos);
+      setErro('');
+    } catch (error) {
+      setErro(`Não foi possível carregar os produtos do Supabase: ${error.message}`);
+    }
   };
 
   const handleFileUpload = (e) => {
@@ -45,7 +54,7 @@ function Admin() {
     setImagens((prev) => prev.filter((_, index) => index !== indexParaRemover));
   };
 
-  const salvarProduto = (e) => {
+  const salvarProduto = async (e) => {
     e.preventDefault();
     if (!nome || !valor) {
       alert('Preencha pelo menos o nome e o valor do tênis!');
@@ -57,7 +66,7 @@ function Admin() {
     const listaImgs = imagens.length > 0 ? imagens : ['https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?w=500'];
 
     const novoProdutoObj = {
-      id: editandoId ? editandoId : Date.now(),
+      ...(editandoId ? { id: editandoId } : {}),
       nome,
       marca,
       valor: parseFloat(valor),
@@ -68,17 +77,22 @@ function Admin() {
       imagens: listaImgs,
     };
 
-    let produtosAtualizados;
-    if (editandoId) {
-      produtosAtualizados = produtos.map((p) => (p.id === editandoId ? novoProdutoObj : p));
-    } else {
-      produtosAtualizados = [novoProdutoObj, ...produtos];
+    setSalvando(true);
+    setErro('');
+    try {
+      const produtoSalvo = await salvarProdutoNoServico(novoProdutoObj, produtos);
+      setProdutos((atuais) => editandoId
+        ? atuais.map((produto) => produto.id === editandoId ? produtoSalvo : produto)
+        : [produtoSalvo, ...atuais]);
+      limparFormulario();
+      alert(hasSupabaseConfig
+        ? 'Produto salvo no Supabase. Atualize a loja para conferir.'
+        : 'Produto salvo apenas neste navegador. Configure o Supabase para publicar para todos os clientes.');
+    } catch (error) {
+      setErro(`Não foi possível salvar no Supabase: ${error.message}`);
+    } finally {
+      setSalvando(false);
     }
-
-    localStorage.setItem('ms_produtos', JSON.stringify(produtosAtualizados));
-    setProdutos(produtosAtualizados);
-    limparFormulario();
-    alert('Produto salvo com sucesso!');
   };
 
   const iniciarEdicao = (produto) => {
@@ -93,12 +107,16 @@ function Admin() {
     setImagens(produto.imagens || []);
   };
 
-  const excluirProduto = (id) => {
+  const excluirProduto = async (id) => {
     if (window.confirm('Tem certeza que deseja excluir este produto?')) {
-      const produtosAtualizados = produtos.filter((p) => p.id !== id);
-      localStorage.setItem('ms_produtos', JSON.stringify(produtosAtualizados));
-      setProdutos(produtosAtualizados);
-      if (editandoId === id) limparFormulario();
+      setErro('');
+      try {
+        await excluirProdutoDoServico(id, produtos);
+        setProdutos((atuais) => atuais.filter((produto) => produto.id !== id));
+        if (editandoId === id) limparFormulario();
+      } catch (error) {
+        setErro(`Não foi possível excluir do Supabase: ${error.message}`);
+      }
     }
   };
 
@@ -131,6 +149,13 @@ function Admin() {
           <button onClick={fazerLogout} style={{ background: '#d9534f', color: '#fff', border: 'none', padding: '8px 12px', borderRadius: '4px', cursor: 'pointer' }}>Sair 🚪</button>
         </div>
       </div>
+
+      <div style={{ maxWidth: '900px', margin: '0 auto 20px auto', padding: '12px 16px', borderRadius: '6px', background: hasSupabaseConfig ? '#e8f5e9' : '#fff3cd', color: hasSupabaseConfig ? '#1b5e20' : '#664d03', border: `1px solid ${hasSupabaseConfig ? '#a5d6a7' : '#ffecb5'}` }}>
+        {hasSupabaseConfig
+          ? 'Supabase configurado: os cadastros serão enviados ao banco. A confirmação só aparece após a gravação ser aceita.'
+          : 'Atenção: Supabase não configurado. Os produtos ficam somente neste navegador e não aparecem para outros clientes.'}
+      </div>
+      {erro && <div role="alert" style={{ maxWidth: '900px', margin: '0 auto 20px auto', padding: '12px 16px', borderRadius: '6px', background: '#f8d7da', color: '#842029', border: '1px solid #f5c2c7', overflowWrap: 'anywhere' }}>{erro}</div>}
 
       <div style={{ maxWidth: '900px', margin: '0 auto 30px auto', background: '#fff', padding: '25px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
         <h3 style={{ marginTop: 0, color: '#222', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
@@ -205,8 +230,8 @@ function Admin() {
           )}
 
           <div style={{ display: 'flex', gap: '10px' }}>
-            <button type="submit" style={{ background: '#000', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: '5px', fontWeight: 'bold', cursor: 'pointer' }}>
-              {editandoId ? 'Salvar Alterações' : 'Cadastrar Tênis'}
+            <button type="submit" disabled={salvando} style={{ background: '#000', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: '5px', fontWeight: 'bold', cursor: salvando ? 'wait' : 'pointer', opacity: salvando ? 0.7 : 1 }}>
+              {salvando ? 'Salvando...' : editandoId ? 'Salvar Alterações' : 'Cadastrar Tênis'}
             </button>
             {editandoId && (
               <button type="button" onClick={limparFormulario} style={{ background: '#6c757d', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: '5px', fontWeight: 'bold', cursor: 'pointer' }}>

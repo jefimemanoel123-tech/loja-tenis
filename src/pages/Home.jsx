@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import LogoMs from '../assets/Logo-ms.png';
+import { getProdutos } from '../services/produtosService';
 
 function Home() {
   const lerLocalStorage = (chave, valorPadrao) => {
@@ -12,6 +13,8 @@ function Home() {
   };
 
   const [produtos, setProdutos] = useState([]);
+  const [erroProdutos, setErroProdutos] = useState('');
+  const [carregandoProdutos, setCarregandoProdutos] = useState(true);
   const [carrinho, setCarrinho] = useState([]);
   const [favoritos, setFavoritos] = useState([]);
   const [nomeCliente, setNomeCliente] = useState('');
@@ -28,39 +31,32 @@ function Home() {
   const [filtroGenero, setFiltroGenero] = useState('Todos');
   const [filtroMarca, setFiltroMarca] = useState('Todas');
   const [filtroTamanho, setFiltroTamanho] = useState('Todos');
-  const [filtroPrecoMax, setFiltroPrecoMax] = useState('1000');
+  const [filtroPrecoMax, setFiltroPrecoMax] = useState('10000');
   const [mostrarApenasFavoritos, setMostrarApenasFavoritos] = useState(false);
 
+  const carregarProdutos = useCallback(async (mostrarIndicador = false) => {
+    if (mostrarIndicador) setCarregandoProdutos(true);
+    try {
+      const produtosSalvos = await getProdutos();
+      setProdutos(produtosSalvos);
+      setErroProdutos('');
+    } catch (error) {
+      setErroProdutos(`Não foi possível carregar os produtos da loja: ${error.message}`);
+    } finally {
+      setCarregandoProdutos(false);
+    }
+  }, []);
+
   useEffect(() => {
-    const produtosSalvos = lerLocalStorage('ms_produtos', [
-      {
-        id: 1,
-        nome: 'Tenis Nike Air Force 1',
-        marca: 'Nike',
-        valor: 350.0,
-        genero: 'Unissex',
-        tamanhos: [38, 39, 40, 41, 42],
-        cores: ['Branco', 'Preto/Branco'],
-        observacao: 'Frete Grátis para BH!',
-        imagens: ['https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?w=500']
-      },
-      {
-        id: 2,
-        nome: 'Tenis Adidas Superstar',
-        marca: 'Adidas',
-        valor: 320.0,
-        genero: 'Feminino',
-        tamanhos: [37, 38, 39, 40],
-        cores: ['Branco/Preto', 'Total Black'],
-        observacao: 'Cupom: MS10',
-        imagens: ['https://images.unsplash.com/photo-1584735935682-2f2b69dff9d2?w=500']
-      }
-    ]);
-    setProdutos(produtosSalvos);
+    carregarProdutos(true);
+
+    const atualizarAoVoltar = () => carregarProdutos();
+    window.addEventListener('focus', atualizarAoVoltar);
 
     const favoritosSalvos = lerLocalStorage('ms_favoritos', []);
     setFavoritos(favoritosSalvos);
-  }, []);
+    return () => window.removeEventListener('focus', atualizarAoVoltar);
+  }, [carregarProdutos]);
 
   const toggleFavorito = (produtoId, e) => {
     e.stopPropagation();
@@ -233,7 +229,7 @@ function Home() {
                 <input 
                   type="range" 
                   min="150" 
-                  max="1000" 
+                  max="10000" 
                   step="50" 
                   value={filtroPrecoMax} 
                   onChange={(e) => setFiltroPrecoMax(e.target.value)} 
@@ -243,11 +239,20 @@ function Home() {
             </div>
           </div>
 
+          {erroProdutos && (
+            <div role="alert" style={{ color: '#842029', background: '#f8d7da', padding: '12px', borderRadius: '6px', overflowWrap: 'anywhere', marginBottom: '16px' }}>
+              <p style={{ margin: '0 0 8px' }}>{erroProdutos}</p>
+              <button onClick={() => carregarProdutos(true)} style={{ padding: '7px 12px', border: '1px solid #842029', borderRadius: '4px', background: '#fff', color: '#842029', cursor: 'pointer' }}>Tentar novamente</button>
+            </div>
+          )}
+
           <h2 style={{ marginBottom: '20px', color: '#222', borderBottom: '2px solid #ddd', paddingBottom: '10px' }}>
             {mostrarApenasFavoritos ? '❤️ Meus Tênis Favoritos' : 'Lançamentos Disponíveis'} ({produtosFiltrados.length})
           </h2>
 
-          {produtosFiltrados.length === 0 ? (
+          {carregandoProdutos ? (
+            <p role="status" aria-live="polite" style={{ color: '#666', background: '#fff', padding: '20px', borderRadius: '8px', textAlign: 'center' }}>Carregando os tênis da loja...</p>
+          ) : erroProdutos ? null : produtosFiltrados.length === 0 ? (
             <p style={{ color: '#666', background: '#fff', padding: '20px', borderRadius: '8px', textAlign: 'center' }}>Nenhum tênis encontrado.</p>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: '15px' }}>
